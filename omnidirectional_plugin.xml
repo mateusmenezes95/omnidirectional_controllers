@@ -1,0 +1,7 @@
+<library path="omnidirectional_controllers">
+  <class name="omnidirectional_controllers/OmnidirectionalController" type="omnidirectional_controllers::OmnidirectionalController" base_class_type="controller_interface::ControllerInterface">
+  <description>
+    The Omnidirectional controller transforms linear and angular velocity messages into signals for each wheel(s) for a Omnidirectional robot with three wheels.
+  </description>
+  </class>
+</library>

@@ -30,6 +30,7 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
 #include "rclcpp/logging.hpp"
+#include "tf2/LinearMath/Quaternion.h"
 
 namespace {
 constexpr auto DEFAULT_COMMAND_TOPIC = "~/cmd_vel";
@@ -75,6 +76,8 @@ controller_interface::return_type OmnidirectionalController::init(
 
     auto_declare<std::string>("odom_frame_id", odom_params_.odom_frame_id);
     auto_declare<std::string>("base_frame_id", odom_params_.base_frame_id);
+    auto_declare<std::string>("odom_numeric_integration_method",
+      odom_params_.odom_numeric_integration_method);
     auto_declare<std::vector<double>>("pose_covariance_diagonal", std::vector<double>());
     auto_declare<std::vector<double>>("twist_covariance_diagonal", std::vector<double>());
     auto_declare<bool>("open_loop", odom_params_.open_loop);
@@ -135,11 +138,6 @@ CallbackReturn OmnidirectionalController::on_configure(
   cos_gamma = cos(deg2rad(robot_params_.gamma));
   sin_gamma = cos(deg2rad(robot_params_.gamma));
 
-  // odometry_.setWheelParams(
-    // robot_params_.robot_radius, robot_params_.wheel_radius, robot_params_.gamma);
-  // odometry_.setVelocityRollingWindowSize(
-    // node_->get_parameter("velocity_rolling_window_size").as_int());
-
   odom_params_.odom_frame_id = node_->get_parameter("odom_frame_id").as_string();
   odom_params_.base_frame_id = node_->get_parameter("base_frame_id").as_string();
 
@@ -153,6 +151,18 @@ CallbackReturn OmnidirectionalController::on_configure(
 
   odom_params_.open_loop = node_->get_parameter("open_loop").as_bool();
   odom_params_.enable_odom_tf = node_->get_parameter("enable_odom_tf").as_bool();
+  odom_params_.odom_numeric_integration_method = node_->get_parameter(
+    "odom_numeric_integration_method").as_string();
+
+  if (odom_params_.odom_numeric_integration_method != EULER_FORWARD &&
+      odom_params_.odom_numeric_integration_method != RUNGE_KUTTA2) {
+    RCLCPP_WARN(logger,
+      "Invalid numeric integration got: %s. Using default %s intead",
+      odom_params_.odom_numeric_integration_method.c_str(),
+      EULER_FORWARD);
+      odom_params_.odom_numeric_integration_method = EULER_FORWARD;
+  }
+  odometry_.setNumericIntegrationMethod(odom_params_.odom_numeric_integration_method);
 
   cmd_vel_timeout_ = std::chrono::milliseconds{
     static_cast<int>(node_->get_parameter("cmd_vel_timeout").as_double() * 1000.0)};
@@ -160,51 +170,49 @@ CallbackReturn OmnidirectionalController::on_configure(
 
   // initialize command subscriber
   if (use_stamped_vel_) {
-    velocity_command_subscriber_ = node_->create_subscription<geometry_msgs::msg::TwistStamped>(
+    vel_cmd_subscriber_ = node_->create_subscription<geometry_msgs::msg::TwistStamped>(
       DEFAULT_COMMAND_TOPIC,
       rclcpp::SystemDefaultsQoS(),
       std::bind(&OmnidirectionalController::velocityCommandStampedCallback, this, _1));
   } else {
-    velocity_command_unstamped_subscriber_ = node_->create_subscription<geometry_msgs::msg::Twist>(
+    vel_cmd_unstamped_subscriber_ = node_->create_subscription<geometry_msgs::msg::Twist>(
       DEFAULT_COMMAND_UNSTAMPED_TOPIC,
       rclcpp::SystemDefaultsQoS(),
       std::bind(&OmnidirectionalController::velocityCommandUnstampedCallback, this, _1));
   }
 
-  // // initialize odometry publisher and messasge
-  // odometry_publisher_ = node_->create_publisher<nav_msgs::msg::Odometry>(
-  //   DEFAULT_ODOMETRY_TOPIC, rclcpp::SystemDefaultsQoS());
+  // initialize odometry publisher and messasge
+  odometry_publisher_ = node_->create_publisher<nav_msgs::msg::Odometry>(
+    DEFAULT_ODOMETRY_TOPIC, rclcpp::SystemDefaultsQoS());
 
-  // // limit the publication on the topics /odom and /tf
-  // publish_rate_ = node_->get_parameter("publish_rate").as_double();
-  // publish_period_ = rclcpp::Duration::from_seconds(1.0 / publish_rate_);
-  // previous_publish_timestamp_ = node_->get_clock()->now();
+  // limit the publication on the topics /odom and /tf
+  publish_rate_ = node_->get_parameter("publish_rate").as_double();
+  publish_period_ = rclcpp::Duration::from_seconds(1.0 / publish_rate_);
+  previous_publish_timestamp_ = node_->get_clock()->now();
 
-  // // initialize odom values zeros
-  // odometry_message.twist =
-  //   geometry_msgs::msg::TwistWithCovariance(rosidl_runtime_cpp::MessageInitialization::ALL);
+  // initialize odom values zeros
+  odometry_message_.twist =
+      geometry_msgs::msg::TwistWithCovariance(rosidl_runtime_cpp::MessageInitialization::ALL);
 
-  // constexpr size_t NUM_DIMENSIONS = 6;
-  // for (size_t index = 0; index < 6; ++index)
-  // {
-  //   // 0, 7, 14, 21, 28, 35
-  //   const size_t diagonal_index = NUM_DIMENSIONS * index + index;
-  //   odometry_message.pose.covariance[diagonal_index] = odom_params_.pose_covariance_diagonal[index];
-  //   odometry_message.twist.covariance[diagonal_index] =
-  //     odom_params_.twist_covariance_diagonal[index];
-  // }
+  constexpr size_t NUM_DIMENSIONS = 6;
+  for (size_t index = 0; index < 6; ++index) {
+    // 0, 7, 14, 21, 28, 35
+    const size_t diagonal_index = NUM_DIMENSIONS * index + index;
+    odometry_message_.pose.covariance[diagonal_index] =
+      odom_params_.pose_covariance_diagonal[index];
+    odometry_message_.twist.covariance[diagonal_index] =
+      odom_params_.twist_covariance_diagonal[index];
+  }
 
-  // // initialize transform publisher and message
-  // odometry_transform_publisher_ = node_->create_publisher<tf2_msgs::msg::TFMessage>(
-  //   DEFAULT_TRANSFORM_TOPIC, rclcpp::SystemDefaultsQoS());
+  // initialize transform publisher and message
+  odometry_transform_publisher_ = node_->create_publisher<tf2_msgs::msg::TFMessage>(
+    DEFAULT_TRANSFORM_TOPIC, rclcpp::SystemDefaultsQoS());
 
-  // // keeping track of odom and base_link transforms only
-  // auto & odometry_transform_message = realtime_odometry_transform_publisher_->msg_;
-  // odometry_transform_message.transforms.resize(1);
-  // odometry_transform_message.transforms.front().header.frame_id = odom_params_.odom_frame_id;
-  // odometry_transform_message.transforms.front().child_frame_id = odom_params_.base_frame_id;
+  // keeping track of odom and base_link transforms only
+  odometry_transform_message_.transforms.resize(1);
+  odometry_transform_message_.transforms.front().header.frame_id = odom_params_.odom_frame_id;
+  odometry_transform_message_.transforms.front().child_frame_id = odom_params_.base_frame_id;
 
-  previous_update_timestamp_ = node_->get_clock()->now();
   return CallbackReturn::SUCCESS;
 }
 
@@ -253,6 +261,8 @@ CallbackReturn OmnidirectionalController::on_activate(
   subscriber_is_active_ = true;
 
   RCLCPP_DEBUG(node_->get_logger(), "Subscriber and publisher are now active.");
+  previous_update_timestamp_ = node_->get_clock()->now();
+
   return CallbackReturn::SUCCESS;
 }
 
@@ -260,6 +270,7 @@ CallbackReturn OmnidirectionalController::on_deactivate(
   const rclcpp_lifecycle::State & previous_state) {
   RCLCPP_INFO(node_->get_logger(), "on_deactivate");
   subscriber_is_active_ = false;
+  odometry_.reset();
   return CallbackReturn::SUCCESS;
 }
 
@@ -321,69 +332,39 @@ controller_interface::return_type OmnidirectionalController::update() {
     cmd_vel_->twist.angular.z = 0.0;
   }
 
-  // if (odom_params_.open_loop) {
-  //   odometry_.updateOpenLoop(linear_command, angular_command, current_time);
-  // } else {
-  //   double left_position_mean = 0.0;
-  //   double right_position_mean = 0.0;
-  //   for (size_t index = 0; index < wheels.wheels_per_side; ++index) {
-  //     const double left_position = registered_left_wheel_handles_[index].position.get().get_value();
-  //     const double right_position =
-  //       registered_right_wheel_handles_[index].position.get().get_value();
-
-  //     if (std::isnan(left_position) || std::isnan(right_position)) {
-  //       RCLCPP_ERROR(
-  //         logger, "Either the left or right wheel position is invalid for index [%zu]", index);
-  //       return controller_interface::return_type::ERROR;
-  //     }
-
-  //     left_position_mean += left_position;
-  //     right_position_mean += right_position;
-  //   }
-  //   left_position_mean /= wheels.wheels_per_side;
-  //   right_position_mean /= wheels.wheels_per_side;
-
-  //   odometry_.update(left_position_mean, right_position_mean, current_time);
-  // }
-
-  // tf2::Quaternion orientation;
-  // orientation.setRPY(0.0, 0.0, odometry_.getHeading());
-
-  // if (previous_publish_timestamp_ + publish_period_ < current_time)
-  // {
-  //   previous_publish_timestamp_ += publish_period_;
-
-  //   if (realtime_odometry_publisher_->trylock())
-  //   {
-  //     auto & odometry_message = realtime_odometry_publisher_->msg_;
-  //     odometry_message.header.stamp = current_time;
-  //     odometry_message.pose.pose.position.x = odometry_.getX();
-  //     odometry_message.pose.pose.position.y = odometry_.getY();
-  //     odometry_message.pose.pose.orientation.x = orientation.x();
-  //     odometry_message.pose.pose.orientation.y = orientation.y();
-  //     odometry_message.pose.pose.orientation.z = orientation.z();
-  //     odometry_message.pose.pose.orientation.w = orientation.w();
-  //     odometry_message.twist.twist.linear.x = odometry_.getLinear();
-  //     odometry_message.twist.twist.angular.z = odometry_.getAngular();
-  //     realtime_odometry_publisher_->unlockAndPublish();
-  //   }
-
-  //   if (odom_params_.enable_odom_tf && realtime_odometry_transform_publisher_->trylock())
-  //   {
-  //     auto & transform = realtime_odometry_transform_publisher_->msg_.transforms.front();
-  //     transform.header.stamp = current_time;
-  //     transform.transform.translation.x = odometry_.getX();
-  //     transform.transform.translation.y = odometry_.getY();
-  //     transform.transform.rotation.x = orientation.x();
-  //     transform.transform.rotation.y = orientation.y();
-  //     transform.transform.rotation.z = orientation.z();
-  //     transform.transform.rotation.w = orientation.w();
-  //     realtime_odometry_transform_publisher_->unlockAndPublish();
-  //   }
-  // }
-
-  const auto update_dt = current_time - previous_update_timestamp_;
+  const rclcpp::Duration update_dt = current_time - previous_update_timestamp_;
   previous_update_timestamp_ = current_time;
+
+  odometry_.updateOpenLoop(
+    {cmd_vel_->twist.linear.x,  cmd_vel_->twist.linear.y, cmd_vel_->twist.angular.z},
+    update_dt.seconds());
+
+  tf2::Quaternion orientation;
+  orientation.setRPY(0.0, 0.0, odometry_.getPose().theta);
+
+  if (previous_publish_timestamp_ + publish_period_ < current_time) {
+    previous_publish_timestamp_ += publish_period_;
+    odometry_message_.header.stamp = current_time;
+    odometry_message_.pose.pose.position.x = odometry_.getPose().x;
+    odometry_message_.pose.pose.position.y = odometry_.getPose().y;
+    odometry_message_.pose.pose.orientation.x = orientation.x();
+    odometry_message_.pose.pose.orientation.y = orientation.y();
+    odometry_message_.pose.pose.orientation.z = orientation.z();
+    odometry_message_.pose.pose.orientation.w = orientation.w();
+    odometry_message_.twist.twist.linear = cmd_vel_->twist.linear;
+    odometry_message_.twist.twist.angular = cmd_vel_->twist.angular;
+    odometry_publisher_->publish(odometry_message_);
+  }
+
+  // if (odom_params_.enable_odom_tf) {
+  //   odometry_transform_message_.header.stamp = current_time;
+  //   odometry_transform_message_.transform.translation.x = odometry_.getPose().x;
+  //   odometry_transform_message_.transform.translation.y = odometry_.getPose().y;
+  //   odometry_transform_message_.transform.rotation.x = orientation.x();
+  //   odometry_transform_message_.transform.rotation.y = orientation.y();
+  //   odometry_transform_message_.transform.rotation.z = orientation.z();
+  //   odometry_transform_message_.transform.rotation.w = orientation.w();
+  // }
 
   // Compute wheels velocities:
   double vx = cmd_vel_->twist.linear.x;

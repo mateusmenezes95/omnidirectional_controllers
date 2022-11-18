@@ -35,11 +35,13 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "tf2_msgs/msg/tf_message.hpp"
 
+#include "omnidirectional_controllers/odometry.hpp"
+#include "omnidirectional_controllers/types.hpp"
+
 namespace omnidirectional_controllers {
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 class OmnidirectionalController : public controller_interface::ControllerInterface {
-
  public:
   OmnidirectionalController();
   controller_interface::return_type init(const std::string & controller_name) override;
@@ -71,26 +73,28 @@ class OmnidirectionalController : public controller_interface::ControllerInterfa
     bool enable_odom_tf = true;
     std::string base_frame_id = "base_link";
     std::string odom_frame_id = "odom";
+    std::string odom_numeric_integration_method = EULER_FORWARD;
     std::array<double, 6> pose_covariance_diagonal;
     std::array<double, 6> twist_covariance_diagonal;
   } odom_params_;
 
   bool use_stamped_vel_ = true;
 
-  // Odometry odometry_;
+  Odometry odometry_;
 
-  std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> odometry_publisher_ = nullptr;
-  std::shared_ptr<rclcpp::Publisher<tf2_msgs::msg::TFMessage>> odometry_transform_publisher_ =
-    nullptr;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_ = nullptr;
+  rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr odometry_transform_publisher_ = nullptr;
+
+  tf2_msgs::msg::TFMessage odometry_transform_message_;
+  nav_msgs::msg::Odometry odometry_message_;
 
   // Timeout to consider cmd_vel commands old
   std::chrono::milliseconds cmd_vel_timeout_{500};
 
   bool subscriber_is_active_ = false;
-  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr
-    velocity_command_subscriber_ = nullptr;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr vel_cmd_subscriber_ = nullptr;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr
-    velocity_command_unstamped_subscriber_ = nullptr;
+    vel_cmd_unstamped_subscriber_ = nullptr;
 
   rclcpp::Time previous_update_timestamp_{0};
 

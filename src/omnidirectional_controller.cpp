@@ -116,6 +116,10 @@ CallbackReturn OmnidirectionalController::on_configure(
     const rclcpp_lifecycle::State & previous_state) {
   auto logger = node_->get_logger();
 
+  RCLCPP_DEBUG(logger,
+    "Called on_configure. Previous state was %s",
+    previous_state.label());
+
   // update parameters
   wheel_names_ = node_->get_parameter("wheel_names").as_string_array();
 
@@ -220,6 +224,10 @@ CallbackReturn OmnidirectionalController::on_activate(
   const rclcpp_lifecycle::State & previous_state) {
   auto logger = node_->get_logger();
 
+  RCLCPP_DEBUG(logger,
+    "Called on_activate. Previous state was %s",
+    previous_state.label());
+
   if (wheel_names_.empty()) {
     RCLCPP_ERROR(logger, "No wheel names specified");
     return CallbackReturn::ERROR;
@@ -268,7 +276,9 @@ CallbackReturn OmnidirectionalController::on_activate(
 
 CallbackReturn OmnidirectionalController::on_deactivate(
   const rclcpp_lifecycle::State & previous_state) {
-  RCLCPP_INFO(node_->get_logger(), "on_deactivate");
+  RCLCPP_DEBUG(node_->get_logger(),
+    "Called on_deactivate. Previous state was %s",
+    previous_state.label());
   subscriber_is_active_ = false;
   odometry_.reset();
   return CallbackReturn::SUCCESS;
@@ -276,19 +286,25 @@ CallbackReturn OmnidirectionalController::on_deactivate(
 
 CallbackReturn OmnidirectionalController::on_cleanup(
   const rclcpp_lifecycle::State & previous_state) {
-  RCLCPP_INFO(node_->get_logger(), "on_cleanup");
+  RCLCPP_DEBUG(node_->get_logger(),
+    "Called on_cleanup. Previous state was %s",
+    previous_state.label());
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn OmnidirectionalController::on_error(
   const rclcpp_lifecycle::State & previous_state) {
-  RCLCPP_INFO(node_->get_logger(), "on_error");
+  RCLCPP_DEBUG(node_->get_logger(),
+    "Called on_error. Previous state was %s",
+    previous_state.label());
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn OmnidirectionalController::on_shutdown(
   const rclcpp_lifecycle::State & previous_state) {
-  RCLCPP_INFO(node_->get_logger(), "on_shutdown");
+  RCLCPP_DEBUG(node_->get_logger(),
+    "Called on_error. Previous state was %s",
+    previous_state.label());
   return CallbackReturn::SUCCESS;
 }
 

@@ -20,31 +20,38 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef OMNIDIRECTIONAL_CONTROLLERS__TYPES_HPP_
-#define OMNIDIRECTIONAL_CONTROLLERS__TYPES_HPP_
+#ifndef OMNIDIRECTIONAL_CONTROLLERS__KINEMATICS_HPP_
+#define OMNIDIRECTIONAL_CONTROLLERS__KINEMATICS_HPP_
 
-#define DEG2RAD(deg) (deg * M_PI / 180.0)
+#include <memory>
+#include <vector>
+
+#include "omnidirectional_controllers/types.hpp"
 
 namespace omnidirectional_controllers {
 
-struct RobotParams {
-  double wheel_radius;
-  double robot_radius;
-  double gamma;
-};
+constexpr double OMNI_ROBOT_MAX_WHEELS = 4;
 
-struct RobotVelocity {
-  double vx;    // [m/s]
-  double vy;    // [m/s]
-  double omega;    // [rad]
-};
-
-struct RobotPose {
-  double x;        //  [m]
-  double y;        //  [m]
-  double theta;    // [rad]
+class Kinematics {
+ public:
+  explicit Kinematics(RobotParams robot_params);
+  Kinematics();
+  ~Kinematics();
+  // Forward kinematics
+  RobotVelocity getBodyVelocity(const std::vector<double> & wheels_vel);
+  // Inverse kinematics
+  std::vector<double> getWheelsAngularVelocities(RobotVelocity vel);
+  void setRobotParams(RobotParams robot_params);
+ private:
+  void initializeParams();
+  RobotParams robot_params_;
+  std::vector<double> angular_vel_vec_;
+  double cos_gamma_;
+  double sin_gamma_;
+  double alpha_;
+  double beta_;
 };
 
 }  // namespace omnidirectional_controllers
 
-#endif  // OMNIDIRECTIONAL_CONTROLLERS__TYPES_HPP_
+#endif  // OMNIDIRECTIONAL_CONTROLLERS__KINEMATICS_HPP_

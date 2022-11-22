@@ -51,10 +51,6 @@ using hardware_interface::HW_IF_VELOCITY;
 using lifecycle_msgs::msg::State;
 using std::placeholders::_1;
 
-static double deg2rad(double deg) {
-    return deg * M_PI / 180.0;
-}
-
 OmnidirectionalController::OmnidirectionalController()
   : controller_interface::ControllerInterface()
   , cmd_vel_(std::make_shared<geometry_msgs::msg::TwistStamped>()) {}
@@ -139,8 +135,8 @@ CallbackReturn OmnidirectionalController::on_configure(
   robot_params_.wheel_radius = node_->get_parameter("wheel_radius").as_double();
   robot_params_.gamma = node_->get_parameter("gamma").as_double();
 
-  cos_gamma = cos(deg2rad(robot_params_.gamma));
-  sin_gamma = cos(deg2rad(robot_params_.gamma));
+  cos_gamma = cos(DEG2RAD(robot_params_.gamma));
+  sin_gamma = cos(DEG2RAD(robot_params_.gamma));
 
   odom_params_.odom_frame_id = node_->get_parameter("odom_frame_id").as_string();
   odom_params_.base_frame_id = node_->get_parameter("base_frame_id").as_string();

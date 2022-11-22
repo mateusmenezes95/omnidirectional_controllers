@@ -37,6 +37,7 @@ endforeach()
 add_library(${PROJECT_NAME} SHARED
   src/omnidirectional_controller.cpp
   src/odometry.cpp
+  src/kinematics.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -71,8 +72,17 @@ if(BUILD_TESTING)
     src/odometry.cpp
   )
 
+  ament_add_gmock(
+    test_kinematics
+    test/test_kinematics.cpp
+    src/kinematics.cpp
+  )
+
   target_include_directories(test_odometry PRIVATE include)
   ament_target_dependencies(test_odometry)
+
+  target_include_directories(test_kinematics PRIVATE include)
+  ament_target_dependencies(test_kinematics)
 endif()
 
 ament_export_dependencies(

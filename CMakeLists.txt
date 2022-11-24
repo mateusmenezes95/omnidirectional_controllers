@@ -34,10 +34,30 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
 
+add_library(odometry SHARED)
+
+target_sources(odometry 
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/odometry.cpp
+)
+
+target_include_directories(odometry
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+add_library(kinematics SHARED)
+
+target_sources(kinematics 
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/kinematics.cpp
+)
+
+target_include_directories(kinematics
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 add_library(${PROJECT_NAME} SHARED
   src/omnidirectional_controller.cpp
-  src/odometry.cpp
-  src/kinematics.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -45,7 +65,14 @@ target_include_directories(${PROJECT_NAME}
   $<INSTALL_INTERFACE:include>
 )
 
-ament_target_dependencies(${PROJECT_NAME} ${THIS_PACKAGE_INCLUDE_DEPENDS})
+ament_target_dependencies(${PROJECT_NAME}
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
+target_link_libraries(${PROJECT_NAME}
+  odometry
+  kinematics
+)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 pluginlib_export_plugin_description_file(controller_interface omnidirectional_plugin.xml)
@@ -72,10 +99,20 @@ if(BUILD_TESTING)
     src/odometry.cpp
   )
 
+  target_link_libraries(test_odometry
+    odometry
+    kinematics
+  )
+
   ament_add_gmock(
     test_kinematics
     test/test_kinematics.cpp
     src/kinematics.cpp
+  )
+
+  target_link_libraries(test_kinematics
+    odometry
+    kinematics
   )
 
   target_include_directories(test_odometry PRIVATE include)

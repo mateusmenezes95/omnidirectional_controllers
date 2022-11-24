@@ -35,6 +35,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "tf2_msgs/msg/tf_message.hpp"
 
+#include "omnidirectional_controllers/kinematics.hpp"
 #include "omnidirectional_controllers/odometry.hpp"
 #include "omnidirectional_controllers/types.hpp"
 
@@ -80,6 +81,7 @@ class OmnidirectionalController : public controller_interface::ControllerInterfa
 
   bool use_stamped_vel_ = true;
 
+  Kinematics omni_robot_kinematics_;
   Odometry odometry_;
 
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_ = nullptr;

@@ -24,6 +24,7 @@
 
 #include <chrono>  // NOLINT
 #include <cmath>
+#include <exception>
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
@@ -134,9 +135,10 @@ CallbackReturn OmnidirectionalController::on_configure(
   robot_params_.robot_radius = node_->get_parameter("robot_radius").as_double();
   robot_params_.wheel_radius = node_->get_parameter("wheel_radius").as_double();
   robot_params_.gamma = node_->get_parameter("gamma").as_double();
+  robot_params_.gamma = DEG2RAD(robot_params_.gamma);
 
-  cos_gamma = cos(DEG2RAD(robot_params_.gamma));
-  sin_gamma = cos(DEG2RAD(robot_params_.gamma));
+  omni_robot_kinematics_.setRobotParams(robot_params_);
+  odometry_.setRobotParams(robot_params_);
 
   odom_params_.odom_frame_id = node_->get_parameter("odom_frame_id").as_string();
   odom_params_.base_frame_id = node_->get_parameter("base_frame_id").as_string();
@@ -347,9 +349,22 @@ controller_interface::return_type OmnidirectionalController::update() {
   const rclcpp::Duration update_dt = current_time - previous_update_timestamp_;
   previous_update_timestamp_ = current_time;
 
-  odometry_.updateOpenLoop(
-    {cmd_vel_->twist.linear.x,  cmd_vel_->twist.linear.y, cmd_vel_->twist.angular.z},
-    update_dt.seconds());
+  if (odom_params_.open_loop) {
+    odometry_.updateOpenLoop(
+      {cmd_vel_->twist.linear.x,  cmd_vel_->twist.linear.y, cmd_vel_->twist.angular.z},
+      update_dt.seconds());
+  } else {
+    std::vector<double> wheels_angular_velocity({0, 0, 0});
+    wheels_angular_velocity[0] = registered_wheel_handles_[0].velocity.get().get_value();
+    wheels_angular_velocity[1] = registered_wheel_handles_[1].velocity.get().get_value();
+    wheels_angular_velocity[2] = registered_wheel_handles_[2].velocity.get().get_value();
+    try {
+      odometry_.update(wheels_angular_velocity, update_dt.seconds());
+    } catch(const std::runtime_error& e) {
+      RCLCPP_ERROR(logger, e.what());
+      rclcpp::shutdown();
+    }
+  }
 
   tf2::Quaternion orientation;
   orientation.setRPY(0.0, 0.0, odometry_.getPose().theta);
@@ -379,18 +394,18 @@ controller_interface::return_type OmnidirectionalController::update() {
   // }
 
   // Compute wheels velocities:
-  double vx = cmd_vel_->twist.linear.x;
-  double vy = cmd_vel_->twist.linear.y;
-  double wl = cmd_vel_->twist.angular.z * robot_params_.robot_radius;
+  RobotVelocity body_vel_setpoint;
+  body_vel_setpoint.vx = cmd_vel_->twist.linear.x;
+  body_vel_setpoint.vy = cmd_vel_->twist.linear.y;
+  body_vel_setpoint.omega = cmd_vel_->twist.angular.z;
 
-  double wm1 = (-vy + wl) / robot_params_.wheel_radius;
-  double wm2 = ((vx * cos_gamma) + (vy * sin_gamma) + wl) / robot_params_.wheel_radius;
-  double wm3 = ((-vx * cos_gamma) + (vy * sin_gamma) + wl) / robot_params_.wheel_radius;
+  std::vector<double> wheels_angular_velocity;
+  wheels_angular_velocity = omni_robot_kinematics_.getWheelsAngularVelocities(body_vel_setpoint);
 
   // Set wheels velocities:
-  registered_wheel_handles_[0].velocity.get().set_value(wm1);
-  registered_wheel_handles_[1].velocity.get().set_value(wm2);
-  registered_wheel_handles_[2].velocity.get().set_value(wm3);
+  registered_wheel_handles_[0].velocity.get().set_value(wheels_angular_velocity.at(0));
+  registered_wheel_handles_[1].velocity.get().set_value(wheels_angular_velocity.at(1));
+  registered_wheel_handles_[2].velocity.get().set_value(wheels_angular_velocity.at(2));
 
   return controller_interface::return_type::OK;
 }

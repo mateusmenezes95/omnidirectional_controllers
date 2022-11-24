@@ -24,7 +24,9 @@
 #define OMNIDIRECTIONAL_CONTROLLERS__ODOMETRY_HPP_
 
 #include <string>
+#include <vector>
 
+#include "omnidirectional_controllers/kinematics.hpp"
 #include "omnidirectional_controllers/types.hpp"
 
 namespace omnidirectional_controllers {
@@ -39,17 +41,24 @@ class Odometry {
   bool setNumericIntegrationMethod(const std::string & numeric_integration_method);
   void setRobotParams(RobotParams params);
   void updateOpenLoop(RobotVelocity vel, double dt);
+  void update(const std::vector<double> & wheels_vel, double dt);
   RobotPose getPose() const;
+  RobotVelocity getBodyVelocity() const;
   void reset();
 
  protected:
-  void integrateByRungeKutta(RobotVelocity vel, double dt);
-  void integrateByEuler(RobotVelocity vel, double dt);
+  void integrateByRungeKutta();
+  void integrateByEuler();
+  void integrateVelocities();
+  RobotVelocity body_vel_{0, 0, 0};
+  double dt_;
 
  private:
   RobotPose pose_{0, 0, 0};
-  RobotParams robot_params_;
+  RobotParams robot_params_{0, 0, 0};
   std::string numeric_integration_method_ = EULER_FORWARD;
+  Kinematics robot_kinematics_;
+  bool is_robot_param_set_{false};
 };
 
 }  // namespace omnidirectional_controllers

@@ -91,14 +91,14 @@ void Odometry::reset() {
 
 void Odometry::integrateByRungeKutta() {
   double theta_bar = pose_.theta + (body_vel_.omega*dt_ / 2);
-  pose_.x = pose_.x + (body_vel_.vx * cos(theta_bar) + body_vel_.vy * sin(theta_bar)) * dt_;
-  pose_.y = pose_.y + (-body_vel_.vx * sin(theta_bar) + body_vel_.vy * cos(theta_bar)) * dt_;
+  pose_.x = pose_.x + (body_vel_.vx * cos(theta_bar) - body_vel_.vy * sin(theta_bar)) * dt_;
+  pose_.y = pose_.y + (body_vel_.vx * sin(theta_bar) + body_vel_.vy * cos(theta_bar)) * dt_;
   pose_.theta = pose_.theta + body_vel_.omega*dt_;
 }
 
 void Odometry::integrateByEuler() {
-  pose_.x = pose_.x + (body_vel_.vx * cos(pose_.theta) + body_vel_.vy * sin(pose_.theta)) * dt_;
-  pose_.y = pose_.y + (-body_vel_.vx * sin(pose_.theta) + body_vel_.vy * cos(pose_.theta)) * dt_;
+  pose_.x = pose_.x + (body_vel_.vx * cos(pose_.theta) - body_vel_.vy * sin(pose_.theta)) * dt_;
+  pose_.y = pose_.y + (body_vel_.vx * sin(pose_.theta) + body_vel_.vy * cos(pose_.theta)) * dt_;
   pose_.theta = pose_.theta + body_vel_.omega*dt_;
 }
 

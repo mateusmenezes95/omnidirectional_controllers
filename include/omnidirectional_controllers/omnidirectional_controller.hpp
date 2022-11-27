@@ -59,8 +59,8 @@ class OmnidirectionalController : public controller_interface::ControllerInterfa
 
  protected:
   struct WheelHandle {
-    std::reference_wrapper<const hardware_interface::LoanedStateInterface> position;
-    std::reference_wrapper<hardware_interface::LoanedCommandInterface> velocity;
+    std::reference_wrapper<const hardware_interface::LoanedStateInterface> velocity_state;
+    std::reference_wrapper<hardware_interface::LoanedCommandInterface> velocity_command;
   };
 
   std::vector<std::string> wheel_names_;

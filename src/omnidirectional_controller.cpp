@@ -104,7 +104,7 @@ InterfaceConfiguration OmnidirectionalController::command_interface_configuratio
 InterfaceConfiguration OmnidirectionalController::state_interface_configuration() const {
   std::vector<std::string> conf_names;
   for (const auto & joint_name : wheel_names_) {
-    conf_names.push_back(joint_name + "/" + HW_IF_POSITION);
+    conf_names.push_back(joint_name + "/" + HW_IF_VELOCITY);
   }
   return {interface_configuration_type::INDIVIDUAL, conf_names};
 }
@@ -237,7 +237,7 @@ CallbackReturn OmnidirectionalController::on_activate(
     const auto state_handle = std::find_if(
       state_interfaces_.cbegin(), state_interfaces_.cend(), [&wheel_name](const auto & interface) {
         return interface.get_name() == wheel_name &&
-               interface.get_interface_name() == HW_IF_POSITION;
+               interface.get_interface_name() == HW_IF_VELOCITY;
       });
 
     if (state_handle == state_interfaces_.cend()) {
@@ -355,9 +355,9 @@ controller_interface::return_type OmnidirectionalController::update() {
       update_dt.seconds());
   } else {
     std::vector<double> wheels_angular_velocity({0, 0, 0});
-    wheels_angular_velocity[0] = registered_wheel_handles_[0].velocity.get().get_value();
-    wheels_angular_velocity[1] = registered_wheel_handles_[1].velocity.get().get_value();
-    wheels_angular_velocity[2] = registered_wheel_handles_[2].velocity.get().get_value();
+    wheels_angular_velocity[0] = registered_wheel_handles_[0].velocity_state.get().get_value();
+    wheels_angular_velocity[1] = registered_wheel_handles_[1].velocity_state.get().get_value();
+    wheels_angular_velocity[2] = registered_wheel_handles_[2].velocity_state.get().get_value();
     try {
       odometry_.update(wheels_angular_velocity, update_dt.seconds());
     } catch(const std::runtime_error& e) {
@@ -403,9 +403,9 @@ controller_interface::return_type OmnidirectionalController::update() {
   wheels_angular_velocity = omni_robot_kinematics_.getWheelsAngularVelocities(body_vel_setpoint);
 
   // Set wheels velocities:
-  registered_wheel_handles_[0].velocity.get().set_value(wheels_angular_velocity.at(0));
-  registered_wheel_handles_[1].velocity.get().set_value(wheels_angular_velocity.at(1));
-  registered_wheel_handles_[2].velocity.get().set_value(wheels_angular_velocity.at(2));
+  registered_wheel_handles_[0].velocity_command.get().set_value(wheels_angular_velocity.at(0));
+  registered_wheel_handles_[1].velocity_command.get().set_value(wheels_angular_velocity.at(1));
+  registered_wheel_handles_[2].velocity_command.get().set_value(wheels_angular_velocity.at(2));
 
   return controller_interface::return_type::OK;
 }

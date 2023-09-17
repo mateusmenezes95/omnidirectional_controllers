@@ -27,6 +27,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp_lifecycle
   rclcpp
   tf2_msgs
+  tf2
+  tf2_ros
 )
 
 find_package(ament_cmake REQUIRED)

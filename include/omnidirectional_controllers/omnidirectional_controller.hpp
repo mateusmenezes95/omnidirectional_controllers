@@ -45,16 +45,16 @@ using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface
 class OmnidirectionalController : public controller_interface::ControllerInterface {
  public:
   OmnidirectionalController();
-  controller_interface::return_type init(const std::string & controller_name) override;
   controller_interface::InterfaceConfiguration command_interface_configuration() const override;
   controller_interface::InterfaceConfiguration state_interface_configuration() const override;
+  CallbackReturn on_init() override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State & previous_state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & previous_state) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & previous_state) override;
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State & previous_state) override;
   CallbackReturn on_error(const rclcpp_lifecycle::State & previous_state) override;
   CallbackReturn on_shutdown(const rclcpp_lifecycle::State & previous_state) override;
-  controller_interface::return_type update() override;
+  controller_interface::return_type update(const rclcpp::Time & time, const rclcpp::Duration & period) override;
   ~OmnidirectionalController();
 
  protected:
@@ -110,6 +110,8 @@ class OmnidirectionalController : public controller_interface::ControllerInterfa
   geometry_msgs::msg::TwistStamped::SharedPtr cmd_vel_;
   double cos_gamma{0};
   double sin_gamma{0};
+
+  std::shared_ptr<rclcpp_lifecycle::LifecycleNode> node_;
 };
 
 }  // namespace omnidirectional_controllers

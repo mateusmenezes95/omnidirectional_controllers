@@ -56,13 +56,8 @@ OmnidirectionalController::OmnidirectionalController()
   : controller_interface::ControllerInterface()
   , cmd_vel_(std::make_shared<geometry_msgs::msg::TwistStamped>()) {}
 
-controller_interface::return_type OmnidirectionalController::init(
-  const std::string & controller_name) {
-  // initialize lifecycle node
-  auto ret = ControllerInterface::init(controller_name);
-  if (ret != controller_interface::return_type::OK) {
-    return ret;
-  }
+CallbackReturn OmnidirectionalController::on_init() {
+  this->node_ = this->get_node();
 
   try {
     auto_declare<std::vector<std::string>>("wheel_names", std::vector<std::string>());
@@ -85,10 +80,10 @@ controller_interface::return_type OmnidirectionalController::init(
     auto_declare<bool>("use_stamped_vel", use_stamped_vel_);
   } catch (const std::exception & e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
-    return controller_interface::return_type::ERROR;
+    return CallbackReturn::ERROR;
   }
 
-  return controller_interface::return_type::OK;
+  return CallbackReturn::SUCCESS;
 }
 
 InterfaceConfiguration OmnidirectionalController::command_interface_configuration() const {
@@ -115,14 +110,14 @@ CallbackReturn OmnidirectionalController::on_configure(
 
   RCLCPP_DEBUG(logger,
     "Called on_configure. Previous state was %s",
-    previous_state.label());
+    previous_state.label().c_str());
 
   // update parameters
   wheel_names_ = node_->get_parameter("wheel_names").as_string_array();
 
   if (wheel_names_.size() != WHEELS_QUANTITY) {
     RCLCPP_ERROR(
-      logger, "The number of wheels [%zu] and the required [%zu] are different",
+      logger, "The number of wheels [%zu] and the required [%d] are different",
       wheel_names_.size(), WHEELS_QUANTITY);
     return CallbackReturn::ERROR;
   }
@@ -224,7 +219,7 @@ CallbackReturn OmnidirectionalController::on_activate(
 
   RCLCPP_DEBUG(logger,
     "Called on_activate. Previous state was %s",
-    previous_state.label());
+    previous_state.label().c_str());
 
   if (wheel_names_.empty()) {
     RCLCPP_ERROR(logger, "No wheel names specified");
@@ -260,8 +255,8 @@ CallbackReturn OmnidirectionalController::on_activate(
     registered_wheel_handles_.emplace_back(
       WheelHandle{std::ref(*state_handle), std::ref(*command_handle)});
 
-    RCLCPP_INFO(logger, "Got command interface: %s", command_handle->get_full_name().c_str());
-    RCLCPP_INFO(logger, "Got state interface: %s", state_handle->get_full_name().c_str());
+    RCLCPP_INFO(logger, "Got command interface: %s", command_handle->get_name().c_str());
+    RCLCPP_INFO(logger, "Got state interface: %s", state_handle->get_name().c_str());
   }
 
   subscriber_is_active_ = true;
@@ -276,7 +271,7 @@ CallbackReturn OmnidirectionalController::on_deactivate(
   const rclcpp_lifecycle::State & previous_state) {
   RCLCPP_DEBUG(node_->get_logger(),
     "Called on_deactivate. Previous state was %s",
-    previous_state.label());
+    previous_state.label().c_str());
   subscriber_is_active_ = false;
   odometry_.reset();
   return CallbackReturn::SUCCESS;
@@ -286,7 +281,7 @@ CallbackReturn OmnidirectionalController::on_cleanup(
   const rclcpp_lifecycle::State & previous_state) {
   RCLCPP_DEBUG(node_->get_logger(),
     "Called on_cleanup. Previous state was %s",
-    previous_state.label());
+    previous_state.label().c_str());
   return CallbackReturn::SUCCESS;
 }
 
@@ -294,7 +289,7 @@ CallbackReturn OmnidirectionalController::on_error(
   const rclcpp_lifecycle::State & previous_state) {
   RCLCPP_DEBUG(node_->get_logger(),
     "Called on_error. Previous state was %s",
-    previous_state.label());
+    previous_state.label().c_str());
   return CallbackReturn::SUCCESS;
 }
 
@@ -302,7 +297,7 @@ CallbackReturn OmnidirectionalController::on_shutdown(
   const rclcpp_lifecycle::State & previous_state) {
   RCLCPP_DEBUG(node_->get_logger(),
     "Called on_error. Previous state was %s",
-    previous_state.label());
+    previous_state.label().c_str());
   return CallbackReturn::SUCCESS;
 }
 
@@ -334,9 +329,11 @@ void OmnidirectionalController::velocityCommandUnstampedCallback(
   this->cmd_vel_->header.stamp = node_->get_clock()->now();
 }
 
-controller_interface::return_type OmnidirectionalController::update() {
+controller_interface::return_type OmnidirectionalController::update(
+    const rclcpp::Time & time,
+    const rclcpp::Duration & period) {
   auto logger = node_->get_logger();
-  const auto current_time = node_->get_clock()->now();
+  const auto current_time = time;
 
   const auto dt = current_time - cmd_vel_->header.stamp;
   // Brake if cmd_vel has timeout, override the stored command
@@ -346,20 +343,17 @@ controller_interface::return_type OmnidirectionalController::update() {
     cmd_vel_->twist.angular.z = 0.0;
   }
 
-  const rclcpp::Duration update_dt = current_time - previous_update_timestamp_;
-  previous_update_timestamp_ = current_time;
-
   if (odom_params_.open_loop) {
     odometry_.updateOpenLoop(
       {cmd_vel_->twist.linear.x,  cmd_vel_->twist.linear.y, cmd_vel_->twist.angular.z},
-      update_dt.seconds());
+      period.seconds());
   } else {
     std::vector<double> wheels_angular_velocity({0, 0, 0});
     wheels_angular_velocity[0] = registered_wheel_handles_[0].velocity_state.get().get_value();
     wheels_angular_velocity[1] = registered_wheel_handles_[1].velocity_state.get().get_value();
     wheels_angular_velocity[2] = registered_wheel_handles_[2].velocity_state.get().get_value();
     try {
-      odometry_.update(wheels_angular_velocity, update_dt.seconds());
+      odometry_.update(wheels_angular_velocity, period.seconds());
     } catch(const std::runtime_error& e) {
       RCLCPP_ERROR(logger, e.what());
       rclcpp::shutdown();

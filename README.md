@@ -5,6 +5,12 @@ This package provides ROS 2 controllers for controlling Omnidirectional robots w
 **Author:** Mateus Menezes<br />
 **Maintainer:** Mateus Menezes, mateusmenezes95@gmail.com
 
+## Build status
+
+ROS2 Distro | Branch | Build status |
+:---------: | :----: | :----------: |
+**Humble** | [`humble`](https://github.com/mateusmenezes95/omnidirectional_controllers/tree/humble) | [![Build From Source](https://github.com/mateusmenezes95/omnidirectional_controllers/actions/workflows/humble-source-build.yaml/badge.svg)](https://github.com/mateusmenezes95/omnidirectional_controllers/actions/workflows/humble-source-build.yaml)
+
 ## Installation Premises
 
 1. This repository has been tested on [ROS2 Foxy] and with [Classic Gazebo 11];

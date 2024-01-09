@@ -229,10 +229,11 @@ CallbackReturn OmnidirectionalController::on_activate(
   // register handles
   registered_wheel_handles_.reserve(wheel_names_.size());
   for (const auto & wheel_name : wheel_names_) {
-    const auto state_handle = std::find_if(
-      state_interfaces_.cbegin(), state_interfaces_.cend(), [&wheel_name](const auto & interface) {
-        return interface.get_name() == wheel_name &&
-               interface.get_interface_name() == HW_IF_VELOCITY;
+    std::string interface_name = wheel_name + "/" + HW_IF_VELOCITY;
+
+    const auto state_handle = std::find_if(state_interfaces_.cbegin(), state_interfaces_.cend(),
+      [&interface_name](const auto & interface) {
+        return interface.get_name() == interface_name;
       });
 
     if (state_handle == state_interfaces_.cend()) {
@@ -242,9 +243,8 @@ CallbackReturn OmnidirectionalController::on_activate(
 
     const auto command_handle = std::find_if(
       command_interfaces_.begin(), command_interfaces_.end(),
-      [&wheel_name](const auto & interface) {
-        return interface.get_name() == wheel_name &&
-               interface.get_interface_name() == HW_IF_VELOCITY;
+      [&interface_name](const auto & interface) {
+        return interface.get_name() == interface_name;
       });
 
     if (command_handle == command_interfaces_.end()) {

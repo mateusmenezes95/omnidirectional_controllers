@@ -170,11 +170,11 @@ The robot’s velocity with regard to the world (w.r.t) is given by
     v\\
     v_{n}\\
     \omega
-  \end{bmatrix}1
+  \end{bmatrix}
 \end{equation}
 ```
 
-where $R(\theta)$ is the rotation matrix around the $z$ axis perpendicular de horizontal plane $xy$, given by
+where $R(\theta)$ is the rotation matrix around the $z$ axis perpendicular to the horizontal plane $xy$, given by
 
 ```math
 \begin{equation}
@@ -188,9 +188,9 @@ where $R(\theta)$ is the rotation matrix around the $z$ axis perpendicular de ho
 \end{equation}
 ```
 
-Assume that the robot configuration $\mathbf{q}(t_k) = \mathbf{q}_k = (x_k,y_k,\theta_k)$ at the sampling time $t_k$ is known, together with the velocity inputs $v_k$,  $v_{n_k}$, and  $w_k$ applied in the interval $[t_k,\:t_{k+1})$. The value of the configuration variable $\mathbf{q}_{k+1}$ at the sampling time $t_{k+1}$ can then be reconstructed by forward integration of the kinematic model. Adapted from [2].
+Assume that the robot configuration $q(t_k) = q_k = (x_k,y_k,\theta_k)$ at the sampling time $t_k$ is known, together with the velocity inputs $v_k$,  $v_{n_k}$, and  $w_k$ applied in the interval $[t_k,\:t_{k+1})$. The value of the configuration variable $q_{k+1}$ at the sampling time $t_{k+1}$ can then be reconstructed by forward integration of the kinematic model. Adapted from [2].
 
-Considering that the sampling period $T_s = t_{k+1} - t_k$, the Euler method for the axebot configuration $\mathbf{q}_{k+1}$ is given by
+Considering that the sampling period $T_s = t_{k+1} - t_k$, the Euler method for the axebot configuration $q_{k+1}$ is given by
 
 ```math
 \begin{align}
